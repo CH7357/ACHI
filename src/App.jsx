@@ -28,17 +28,13 @@ const STORAGE_KEY = "ajimomomo_level";
 // 每3關一組，size+2；每組前2關easy後1關hard
 // singleton 數量決定難度：越多越簡單
 function getLevelConfig(idx) {
-  // 前20關（idx 0-19）：每5關一循環
-  //   關1-3：5×5 新手  關4：7×7 進階  關5：11×11 挑戰
-  // 20關後（idx >= 20）：每5關一循環，棋盤升級
-  //   關1：5×5 新手  關2-4：7×7 進階  關5：11×11 挑戰
-
+  // 每5關一循環：1-3新手(5×5) / 4進階(7×7) / 5挑戰(9×9)
+  // 20關後升級：1新手(5×5) / 2-4進階(7×7) / 5挑戰(9×9)
   const pos = idx % 5;
   const cycle = Math.floor(idx / 5);
-  const isLate = idx >= 20;  // 20關後
+  const isLate = idx >= 20;
 
   if (!isLate) {
-    // 前20關
     if (pos <= 2) {
       const singletons = Math.max(3, 5 - pos - cycle);
       return { size: 5, singletons, diff: 0 };
@@ -46,24 +42,20 @@ function getLevelConfig(idx) {
       const singletons = Math.max(3, 6 - cycle);
       return { size: 7, singletons, diff: 1 };
     } else {
-      const singletons = Math.max(5, 9 - cycle);
-      return { size: 11, singletons, diff: -1 };
+      const singletons = Math.max(4, 8 - cycle);
+      return { size: 9, singletons, diff: -1 };
     }
   } else {
-    // 20關後
     const lateCycle = Math.floor((idx - 20) / 5);
     if (pos === 0) {
-      // 關1：5×5 新手
       const singletons = Math.max(2, 4 - lateCycle);
       return { size: 5, singletons, diff: 0 };
     } else if (pos <= 3) {
-      // 關2-4：7×7 進階
       const singletons = Math.max(3, 6 - pos - lateCycle);
       return { size: 7, singletons, diff: 1 };
     } else {
-      // 關5：11×11 挑戰
       const singletons = Math.max(4, 7 - lateCycle);
-      return { size: 11, singletons, diff: -1 };
+      return { size: 9, singletons, diff: -1 };
     }
   }
 }
@@ -460,12 +452,14 @@ export default function CatSudoku() {
     },60);
   },[]);
 
+  const [selectedCell,setSelectedCell]=useState(null);
   const handleClick=(r,c)=>{
-    getCtx(); // 確保 AudioContext 已啟動
+    getCtx();
     if(gameStatus!=="playing"||board[r][c]===2) return;
-    const key=`${r},${c}`,now=Date.now(),prev=lastTap[key];
-    if(prev&&now-prev<400){
-      setLastTap({});
+    const key=`${r},${c}`;
+    if(selectedCell===key){
+      // 第二次單擊 → 確認
+      setSelectedCell(null);
       if(solution[r][c]===1){
         sfxFound();
         const nb=board.map(row=>[...row]); nb[r][c]=2; setBoard(nb);
@@ -477,7 +471,7 @@ export default function CatSudoku() {
         setTimeout(()=>{setWrongCell(null);setShakingLife(null);},600);
         setLives(nl); if(nl<=0){setGameStatus("lost");setRevealAll(true);}
       }
-    } else { setLastTap(p=>({...p,[key]:now})); }
+    } else { setSelectedCell(key); }
   };
 
   const startDrag=(r,c)=>{
@@ -505,7 +499,7 @@ export default function CatSudoku() {
   },[]);
 
   const {size}=getLevelConfig(currentLevel);
-  const cellSize=size<=5?58:size<=7?46:size<=9?38:size<=11?30:26;
+  const cellSize=size<=5?58:size<=7?46:38;
 
   if(screen==="select"){
     const lvlIdx=unlockedLevels-1;
@@ -575,12 +569,13 @@ export default function CatSudoku() {
           const state=board[r]?.[c]??0;
           const isFound=state===2,isMarked=state===1;
           const isWrong=wrongCell===`${r},${c}`;
+          const isSelected=selectedCell===`${r},${c}`;
           const showReveal=revealAll&&solution[r]?.[c]===1&&!isFound;
           const catImg=catAssign[`${r},${c}`];
           return(
             <div key={`${r}-${c}`} data-row={r} data-col={c}
               className={`${isFound?"cell-reveal":""} ${isWrong?"cell-wrong":""}`}
-              style={{width:cellSize,height:cellSize,borderRadius:9,background:isFound?color.bg:`${color.bg}AA`,border:`1px solid rgba(0,0,0,0.08)`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",position:"relative",boxShadow:isFound?`0 3px 12px ${color.bg}66`:"none",transition:"box-shadow 0.2s"}}
+              style={{width:cellSize,height:cellSize,borderRadius:9,background:isFound?color.bg:`${color.bg}AA`,border:isSelected?`3px solid #FF6B35`:`1px solid rgba(0,0,0,0.08)`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",position:"relative",touchAction:"none",boxShadow:isFound?`0 3px 12px ${color.bg}66`:"none",transition:"box-shadow 0.2s"}}
               onClick={()=>handleClick(r,c)}
               onMouseDown={()=>startDrag(r,c)}
               onMouseEnter={()=>enterCell(r,c)}
