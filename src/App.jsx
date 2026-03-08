@@ -452,44 +452,48 @@ export default function CatSudoku() {
     },60);
   },[]);
 
-  const [selectedCell,setSelectedCell]=useState(null);
-  const handleClick=(r,c)=>{
-    getCtx();
-    if(gameStatus!=="playing"||board[r][c]===2) return;
-    const key=`${r},${c}`;
-    if(selectedCell===key){
-      // 第二次單擊 → 確認
-      setSelectedCell(null);
-      if(solution[r][c]===1){
-        sfxFound();
-        const nb=board.map(row=>[...row]); nb[r][c]=2; setBoard(nb);
-        const all=solution.every((row,ri)=>row.every((v,ci)=>v!==1||nb[ri][ci]===2));
-        if(all){ sfxWin(); setGameStatus("won"); setUnlockedLevels(u=>Math.max(u,currentLevel+2)); try{localStorage.setItem(STORAGE_KEY,String(currentLevel+1));}catch{} }
-      } else {
-        sfxWrong();
-        setWrongCell(key); const nl=lives-1; setShakingLife(nl);
-        setTimeout(()=>{setWrongCell(null);setShakingLife(null);},600);
-        setLives(nl); if(nl<=0){setGameStatus("lost");setRevealAll(true);}
-      }
-    } else { setSelectedCell(key); }
-  };
+  const pointerMoved=useRef(false);
+const dragStartCell=useRef(null);
 
-  const startDrag=(r,c)=>{
-    getCtx(); // 確保 AudioContext 已啟動
-    if(gameStatus!=="playing"||board[r][c]===2) return;
-    isDragging.current=true; draggedCells.current=new Set([`${r},${c}`]);
-    dragMode.current=board[r][c]===1?"unmark":"mark";
-    if(dragMode.current==="mark") sfxMark();
-    setBoard(prev=>{const nb=prev.map(row=>[...row]);nb[r][c]=dragMode.current==="mark"?1:0;return nb;});
-  };
-  const enterCell=(r,c)=>{
-    if(!isDragging.current||gameStatus!=="playing"||board[r][c]===2) return;
-    const key=`${r},${c}`; if(draggedCells.current.has(key)) return;
-    draggedCells.current.add(key);
-    setBoard(prev=>{const nb=prev.map(row=>[...row]);if(nb[r][c]!==2)nb[r][c]=dragMode.current==="mark"?1:0;return nb;});
-  };
-  const endDrag=()=>{isDragging.current=false;draggedCells.current=new Set();dragMode.current=null;};
+const [selectedCell,setSelectedCell]=useState(null);
+const handleClick=(r,c)=>{
+  if(pointerMoved.current) return;  // 滑動後忽略 click
+  getCtx();
+  // ... 以下不變 ...
+};
 
+const startDrag=(r,c)=>{
+  getCtx();
+  pointerMoved.current=false;
+  dragStartCell.current=`${r},${c}`;
+  if(gameStatus!=="playing"||board[r][c]===2) return;
+  isDragging.current=true; draggedCells.current=new Set([`${r},${c}`]);
+  dragMode.current=board[r][c]===1?"unmark":"mark";
+  // 不立刻標記，等滑到別格才確認
+};
+
+const enterCell=(r,c)=>{
+  if(!isDragging.current||gameStatus!=="playing"||board[r][c]===2) return;
+  const key=`${r},${c}`;
+  if(!pointerMoved.current && key!==dragStartCell.current){
+    pointerMoved.current=true;
+    const startKey=dragStartCell.current;
+    if(startKey){
+      const [sr,sc]=startKey.split(',').map(Number);
+      if(dragMode.current==="mark") sfxMark();
+      setBoard(prev=>{const nb=prev.map(row=>[...row]);if(nb[sr][sc]!==2)nb[sr][sc]=dragMode.current==="mark"?1:0;return nb;});
+    }
+  }
+  if(draggedCells.current.has(key)) return;
+  if(!pointerMoved.current) return;
+  draggedCells.current.add(key);
+  setBoard(prev=>{const nb=prev.map(row=>[...row]);if(nb[r][c]!==2)nb[r][c]=dragMode.current==="mark"?1:0;return nb;});
+};
+
+const endDrag=()=>{
+  setTimeout(()=>{pointerMoved.current=false;},80);
+  isDragging.current=false;draggedCells.current=new Set();dragMode.current=null;dragStartCell.current=null;
+};
   const toggleMute=useCallback(()=>{
     setMuted(m=>{
       const next=!m; mutedRef.current=next;
