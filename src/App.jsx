@@ -458,8 +458,6 @@ export default function CatSudoku() {
 
   const [selectedCell,setSelectedCell]=useState(null);
   const handleClick=(r,c)=>{
-    // 手機 touch 後瀏覽器會補發 onClick，這裡擋掉
-    if(Date.now()-lastTouchEnd.current < 500) return;
     // 如果剛才有滑動，忽略這個 click
     if(pointerMoved.current) return;
     getCtx();
@@ -601,7 +599,7 @@ export default function CatSudoku() {
             <div key={`${r}-${c}`} data-row={r} data-col={c}
               className={`${isFound?"cell-reveal":""} ${isWrong?"cell-wrong":""}`}
               style={{width:cellSize,height:cellSize,borderRadius:9,background:isFound?color.bg:`${color.bg}AA`,border:isSelected?`3px solid #FF6B35`:`1px solid rgba(0,0,0,0.08)`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",position:"relative",touchAction:"none",boxShadow:isFound?`0 3px 12px ${color.bg}66`:"none",transition:"box-shadow 0.2s"}}
-              onClick={()=>handleClick(r,c)}
+              onClick={()=>{if(Date.now()-lastTouchEnd.current<500)return;handleClick(r,c);}}
               onMouseDown={()=>startDrag(r,c)}
               onMouseEnter={()=>enterCell(r,c)}
               onTouchStart={e=>{e.preventDefault();startDrag(r,c);}}
